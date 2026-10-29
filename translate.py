@@ -1,5 +1,6 @@
 import asyncio
 import random
+from poke_env import AccountConfiguration
 
 from poke_engine import Move as Engine_Move
 from poke_engine import Pokemon as Engine_Pokemon
@@ -186,6 +187,17 @@ async def main():
     await bot.battle_against(opponent, n_battles=20)
     print(f"OneTurnPlayer won {bot.n_won_battles} of {bot.n_finished_battles}")
 
+async def main():
+    bot = OneTurnPlayer(
+        account_configuration=AccountConfiguration("FutureSightBot", None),
+        battle_format="gen9randombattle",
+        save_replays=True,
+    )
+    print("Waiting for a challenge... challenge FutureSightBot at http://localhost:8000")
+    await bot.accept_challenges(None, 1)   # None = accept from anyone, 1 = one battle
+    print(f"Done. Bot won {bot.n_won_battles} of {bot.n_finished_battles}")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
+
