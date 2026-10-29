@@ -1,17 +1,3 @@
-"""
-One-turn lookahead bot: the first version of the full pipeline.
-
-    poke-env Battle -> poke-engine State
-
-Run from your FutureSight folder (Showdown server running, venv active):
-    python translate.py
-
-Version 1 simplifications, marked TODO below:
-  - Opponent's unrevealed moves: placeholder instead of a real belief model.
-  - Opponent's unseen Pokemon are left out.
-  - Weather, terrain, hazards and other side conditions are not translated yet.
-"""
-
 import asyncio
 import random
 
