@@ -12,12 +12,9 @@ stat_names = ["hp", "atk", "def", "spa", "spd", "spe"]
 
 class Minimax(Player):
 
-    def estimate_stats(self, mon, gen): # since we can't just get the moves from the opponent, we just sub in the normal ones
-        raw = compute_raw_stats_dvs(mon.species, [15]*6, mon.level, GenData.from_gen(gen)) # showdown uses max dvs, so this is the hypothetical "worst case" opponent
-        labelled_raw = dict(zip(stat_names, raw))
-        for stat, value in mon.stats:
-            if value is None:
-                mon.stats[stat] = labelled_raw[stat] # replace unknown values for the opponent's moves
+    def estimate_stats(self, mon): # since we can't just get the moves from the opponent, we just sub in the normal ones
+        # use the sets JSON data to predict the opponent's pokemon's set
+        return
     def move_outcome(self, battle:Battle, atkr, defr, move, atkr_id, defr_id):
         atkr_hp = atkr.current_hp_fraction
         defr_hp = defr.current_hp_fraction
@@ -32,10 +29,10 @@ class Minimax(Player):
         # if it has "drain" which is so complicated why
         heal = move.drain * dmg * defr.stats["hp"] / atkr.stats["hp"]
         return dmg, min(heal, 1.0-atkr_hp)
-    def outcome_tuple(self, battle:Battle, my_move, their_move):
+    def outcome(self, battle:Battle, my_move, their_move):
         mon_out = battle.active_pokemon
         opponent = battle.opponent_active_pokemon
-        self.estimate_stats(opponent, battle.gen)
+        self.estimate_stats(opponent)
         my_id = mon_out.identifier(battle.player_role)
         opp_id = opponent.identifier(battle.opponent_role)
 
@@ -45,7 +42,7 @@ class Minimax(Player):
         my_dmg, my_heal = self.move_outcome(battle, mon_out, opponent, my_move, my_id, opp_id)
         opp_dmg, opp_heal = self.move_outcome(battle, opponent, mon_out, their_move, opp_id, my_id)
 
-        return (my_dmg - opp_heal, opp_dmg - my_heal)
+        return my_dmg - opp_heal
     def choose_move(self, battle: Battle):
         moves = battle.available_moves
         switches = battle.available_switches
@@ -66,15 +63,15 @@ class Minimax(Player):
         # Because of that, the "score" for this is going to be the net damage. This is heavily subject to change, depending on if it's comprehensive
 
         # also add alpha-beta pruning at some point
-        op_moves = list(opponent.moves.values())
-
-        if len(op_moves) < 4:
-            pass # this is to add moves when we know none
 
 
         if battle.available_moves: # can attack
-            results = [[self.calculate_net(battle, my_move, their_move) for my_move in moves] for their_move in opponent.moves.items()]
-
-        return self.create_order(bestMove)
+            results = [[self.outcome(battle, my_move, their_move) for their_move in list(opponent.moves.values())] for my_move in moves]
+            maximum_options = []
+            for i in range(len(list(opponent.moves.values()))):
+                maximum_options[i] = max(results[i])
+            best_move = min(maximum_options)
+            return self.create_order(best_move)
+        return self.create_order(default_move)
 
 
