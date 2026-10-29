@@ -1,7 +1,7 @@
 from pickle import EMPTY_LIST
 
 from poke_env import Player
-from poke_env.battle import Battle
+from poke_env.battle import Battle, MoveCategory
 from poke_env.calc import calculate_damage
 from poke_env.calc.damage_calc_gen1_2 import calculate_damage_gen12
 from poke_env.data import GenData
@@ -18,18 +18,34 @@ class Minimax(Player):
         for stat, value in mon.stats:
             if value is None:
                 mon.stats[stat] = labelled_raw[stat] # replace unknown values for the opponent's moves
-    def calculate_net(self, battle:Battle, my_move, their_move):
+    def move_outcome(self, battle:Battle, atkr, defr, move, atkr_id, defr_id):
+        atkr_hp = atkr.current_hp_fraction
+        defr_hp = defr.current_hp_fraction
+        if move.category == MoveCategory.STATUS: # doesnt do damage, usually a heal move
+            if move.id == "rest":
+                heal = 1.0-atkr.hp
+            else :
+                heal = move.heal
+            return 0.0, min(heal, 1.0-atkr_hp)
+        low, high, _ = calculate_damage_gen12(atkr_id, defr_id, move, battle)
+        dmg = min((low+high)/2/defr.stats["hp"], defr_hp) # damage done up to fainting the others
+        # if it has "drain" which is so complicated why
+        heal = move.drain * dmg * defr.stats["hp"] / atkr.stats["hp"]
+        return dmg, min(heal, 1.0-atkr_hp)
+    def outcome_tuple(self, battle:Battle, my_move, their_move):
         mon_out = battle.active_pokemon
         opponent = battle.opponent_active_pokemon
         self.estimate_stats(opponent, battle.gen)
-        self_id = mon_out.identifier(battle.player_role)
+        my_id = mon_out.identifier(battle.player_role)
         opp_id = opponent.identifier(battle.opponent_role)
 
-        out_min, out_max, _ = calculate_damage_gen12(self_id, opp_id, my_move, battle)
-        rec_min, rec_max, _ = calculate_damage_gen12(opp_id, self_id, their_move, battle)
-        deal = (out_min+out_max)/2 # maybe change to just out_min and rec_max to follow the minimax ideology of like worst case
-        recieve = (rec_min+rec_max)/2
-        return deal/opponent.stats["hp"] - recieve/mon_out.stats["hp"] # getting the relative damage done to max
+        # out_min, out_max, _ = calculate_damage_gen12(self_id, opp_id, my_move, battle)
+        # rec_min, rec_max, _ = calculate_damage_gen12(opp_id, self_id, their_move, battle)
+
+        my_dmg, my_heal = self.move_outcome(battle, mon_out, opponent, my_move, my_id, opp_id)
+        opp_dmg, opp_heal = self.move_outcome(battle, opponent, mon_out, their_move, opp_id, my_id)
+
+        return (my_dmg - opp_heal, opp_dmg - my_heal)
     def choose_move(self, battle: Battle):
         moves = battle.available_moves
         switches = battle.available_switches
@@ -48,6 +64,8 @@ class Minimax(Player):
 
         # The setup is a matrix with each of the player's actions on one side, and each of the opponent's actions on the other, and each value is the "score" of that path.
         # Because of that, the "score" for this is going to be the net damage. This is heavily subject to change, depending on if it's comprehensive
+
+        # also add alpha-beta pruning at some point
         op_moves = list(opponent.moves.values())
 
         if len(op_moves) < 4:
