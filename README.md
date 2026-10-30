@@ -20,14 +20,14 @@ Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
 
 2. In a second terminal, set up this repo:
 
-   ### Clone the repo
+   Clone the repo
 
    ```
    git clone https://github.com/parkinw-sys/FutureSight.git
    cd FutureSight
    ```
 
-   ### Create a Python venv
+   Create a Python venv
 
    ```macOS/Linux
    python3 -m venv .venv
@@ -39,7 +39,7 @@ Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
    .venv\Scripts\Activate.ps1
    ```
 
-   ### Install Python dependencies
+   Install Python dependencies
 
    ```
    pip install -r requirements.txt
