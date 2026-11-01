@@ -5,7 +5,7 @@ from poke_engine import Pokemon as EnginePokemon
 from poke_engine import Side, State, generate_instructions
 
 from poke_env import AccountConfiguration
-from poke_env.battle import Status
+from poke_env.battle import Status, Battle
 from poke_env.data import GenData
 from poke_env.player import Player, RandomPlayer
 from poke_env.stats import compute_raw_stats
@@ -50,7 +50,7 @@ def engine_types(pokemon):
 
     return tuple(types)
 
-def randbats_stats(pokemon):
+def randbats_stats(pokemon): # getting default stats for pokemon when we dont know them
     hp, attack, defense, sp_attack, sp_defense, speed = compute_raw_stats(
         pokemon.species, 
         [85] * 6, 
@@ -148,7 +148,7 @@ def battle_to_state(battle):
     )
 
 # evaluation function for the game state (minimax) PROBABLY GONNA MOVE THIS TO A DIFFERENT FILE LATER
-
+# ive taken it into my minimax file, thanks felix
 def evaluate(state):
     my_score = 0
     opponent_score = 0
@@ -181,7 +181,7 @@ def my_options(battle):
 
 
 def opponent_options(state):
-    # opponent switches to be implemented later
+    # opponent switches to be implemented later, we'll see
     opponent = state.side_two.pokemon[0]
     moves = []
 
@@ -192,20 +192,21 @@ def opponent_options(state):
 
 # Search (depth 1)
 
-def expected_value(state, my_move, opponent_move):
-    outcomes = generate_instructions(state, my_move, opponent_move)
-
+def expected_value(state, my_move, opponent_move, from_switch): # the expected change in state, in the form of a score
+    outcomes = generate_instructions(state, my_move, opponent_move) # every possible state change, with probabilities of each branch. if passed in move is a pokemon speices id, that's switching. wonderful
+    play_state = State.from_string(state.to_string()) # copy of the real state, so that we don't modify the it while checking
     expected_score = 0
 
-    for outcome in outcomes:
-        probability = outcome.percentage / 100
-        next_state = state.apply_instructions(outcome)
+    for outcome in outcomes: # compiling all the possible changes
+        probability = outcome.percentage / 100 #
+        next_state = play_state.apply_instructions(outcome)
         expected_score += probability * evaluate(next_state)
+        play_state.reverse_instructions(outcome) # revert back to the true state. this could be the source of a future bug
 
     return expected_score
 
 class OneTurnPlayer(Player): # minimax player (depth 1)
-    def choose_move(self, battle):
+    def choose_move(self, battle:Battle):
         if battle.active_pokemon is None or battle.opponent_active_pokemon is None:
             return self.choose_random_move(battle)
         
@@ -219,7 +220,7 @@ class OneTurnPlayer(Player): # minimax player (depth 1)
                 worst_score = float("inf")
 
                 for opponent_move in opponent_options(state):
-                    score = expected_value(state, my_move, opponent_move)
+                    score = expected_value(state, my_move, opponent_move, False)
                     worst_score = min(worst_score, score)
 
                 if worst_score > best_score:
