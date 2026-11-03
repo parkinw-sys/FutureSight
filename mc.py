@@ -4,6 +4,7 @@ from poke_env.battle import Battle
 from poke_env.calc import calculate_damage
 from poke_env.data import GenData
 from poke_env.stats import compute_raw_stats_dvs
+import converter
     
 # BattleState stores current info about the battle, notably that provided by poke-env
 # however, this data needs to be updated node-by-node, so poke-env data from battle object needs to be 
