@@ -6,6 +6,7 @@ from poke_env.battle import Status
 from poke_env.data import GenData
 from poke_env.stats import compute_raw_stats
 
+from belief import GuessedSet, load_randbats_movesets, guess_set
 
 GEN_DATA = GenData.from_gen(9)
 
@@ -20,7 +21,8 @@ STATUS_NAMES = {
     Status.PAR: "paralyze", Status.PSN: "poison", Status.TOX: "toxic",
 }
 
-PLACEHOLDER_MOVE = "tackle"  # implement belief model later
+PLACEHOLDER_MOVE = "tackle"
+RANDBATS_MOVESETS = load_randbats_movesets()
 
 # poke-env to poke-engine conversions
 
@@ -71,22 +73,38 @@ def to_engine_pokemon(pokemon, is_mine):
 
         item = pokemon.item or "none"
         ability = pokemon.ability or "none"
+        tera_type = type_name(pokemon.tera_type)
 
     else:
         stats = randbats_stats(pokemon)
         max_hp = stats["hp"]
         current_hp = round(pokemon.current_hp_fraction * max_hp) # pokemon showdown displays opponent HP as %
-        
-        moves = []
-        for move in pokemon.moves.values():
-            engine_move = EngineMove(id=move.id, pp=move.current_pp)
-            moves.append(engine_move)
-        
-        if not moves:
-            moves = [EngineMove(id=PLACEHOLDER_MOVE)] # belief model later
 
-        item = "none" # belief model later
-        ability = "none" # belief model later
+        guess = guess_set(pokemon, RANDBATS_MOVESETS) # optional randomness for opponent's moveset, item, ability, and tera type
+        # print(pokemon.species, "known:", list(pokemon.moves.keys()), " | unknown:", guess.moves if guess else None) # for debugging
+
+        if guess is not None:
+            guessed_moves = guess.moves
+            item = guess.item
+            ability = guess.ability
+            tera_type = guess.tera_type
+
+        else:
+            guessed_moves = [PLACEHOLDER_MOVE] * 4
+            item = "none"
+            ability = "none"
+            tera_type = "typeless"
+
+        moves = []
+        for move in guessed_moves:
+            revealed_move = pokemon.moves.get(move)
+
+            if revealed_move is not None:
+                engine_move = EngineMove(id=move, pp=revealed_move.current_pp)
+            else:
+                engine_move = EngineMove(id=move) # max PP if move is guessed
+
+            moves.append(engine_move)
 
         if pokemon.fainted:
             current_hp = 0
