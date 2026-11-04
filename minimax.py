@@ -7,11 +7,17 @@ from poke_env.data import GenData
 from poke_env.stats import compute_raw_stats_dvs
 import translate
 from poke_engine import Side, State, generate_instructions
+import math
 
 
 stat_names = ["hp", "atk", "def", "spa", "spd", "spe"]
 
 
+SWITCH_WEIGHT = 0.1 # less than 1, probably less than 1/6.
+# this is to keep the switching scores on par with damage scores
+# a difference between effectiveness "levels" is 1 bc of logarithms,
+# an OHKO from a full team is a difference of only 1/6, and it gets less as the average health goes down.
+# ... maybe we tie this to the average health, hmm...
 
 
 class Minimax(Player):
@@ -68,14 +74,14 @@ class Minimax(Player):
            probability = outcome.percentage / 100  #
            next_state = play_state.apply_instructions(outcome)
            if my_move in battle.available_switches: # special logic for switches
-               current_mult = battle.active_pokemon.damage_multipler(opponent_move)
-               new_mult = next((mon for mon in battle.available_switches if mon.species == to_id_str(my_move))).damage_multipler(opponent_move)
-
-               expected_score += probability * (current_mult-new_mult) # maybe add one, so net neutral is just adding the probability.
+               current_opp_mult = battle.active_pokemon.damage_multipler(opponent_move) # badness for the current pokemon
+               new_opp_mult = next((mon for mon in battle.available_switches if mon.species == to_id_str(my_move))).damage_multipler(opponent_move) # badness for another pokemon
+               if new_opp_mult == 0:
+                   new_opp_mult = 0.1 #avoid dividing by zero, so we assume its the next step down but slightly better since its 0, so instead of 1/8 its 1/10
+               expected_score += probability * SWITCH_WEIGHT * (math.log(current_opp_mult,2)-math.log(new_opp_mult,2)) # turning the geometric relation of the mults into an arithmetic one like damage, plus weighting it
 
            else:
                expected_score += probability * self.evaluate_move(next_state)
-
            play_state.reverse_instructions(outcome)  # revert back to the true state. this could be the source of a future bug
 
        return expected_score
