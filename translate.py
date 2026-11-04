@@ -1,15 +1,12 @@
-import asyncio
-
 from poke_engine import Move as EngineMove
 from poke_engine import Pokemon as EnginePokemon
-from poke_engine import Side, State, generate_instructions
+from poke_engine import Side, State
 
-from poke_env import AccountConfiguration
 from poke_env.battle import Status, Battle
 from poke_env.data import GenData
-from poke_env.player import Player, RandomPlayer
 from poke_env.stats import compute_raw_stats
 
+from belief import GuessedSet, load_randbats_movesets, guess_set
 
 GEN_DATA = GenData.from_gen(9)
 
@@ -24,7 +21,8 @@ STATUS_NAMES = {
     Status.PAR: "paralyze", Status.PSN: "poison", Status.TOX: "toxic",
 }
 
-PLACEHOLDER_MOVE = "tackle"  # implement belief model later
+PLACEHOLDER_MOVE = "tackle"
+RANDBATS_MOVESETS = load_randbats_movesets()
 
 # poke-env to poke-engine conversions
 
@@ -75,22 +73,38 @@ def to_engine_pokemon(pokemon, is_mine):
 
         item = pokemon.item or "none"
         ability = pokemon.ability or "none"
+        tera_type = type_name(pokemon.tera_type)
 
     else:
         stats = randbats_stats(pokemon)
         max_hp = stats["hp"]
         current_hp = round(pokemon.current_hp_fraction * max_hp) # pokemon showdown displays opponent HP as %
-        
-        moves = []
-        for move in pokemon.moves.values():
-            engine_move = EngineMove(id=move.id, pp=move.current_pp)
-            moves.append(engine_move)
-        
-        if not moves:
-            moves = [EngineMove(id=PLACEHOLDER_MOVE)] # belief model later
 
-        item = "none" # belief model later
-        ability = "none" # belief model later
+        guess = guess_set(pokemon, RANDBATS_MOVESETS) # optional randomness for opponent's moveset, item, ability, and tera type
+        # print(pokemon.species, "known:", list(pokemon.moves.keys()), " | unknown:", guess.moves if guess else None) # for debugging
+
+        if guess is not None:
+            guessed_moves = guess.moves
+            item = guess.item
+            ability = guess.ability
+            tera_type = guess.tera_type
+
+        else:
+            guessed_moves = [PLACEHOLDER_MOVE] * 4
+            item = "none"
+            ability = "none"
+            tera_type = "typeless"
+
+        moves = []
+        for move in guessed_moves:
+            revealed_move = pokemon.moves.get(move)
+
+            if revealed_move is not None:
+                engine_move = EngineMove(id=move, pp=revealed_move.current_pp)
+            else:
+                engine_move = EngineMove(id=move) # max PP if move is guessed
+
+            moves.append(engine_move)
 
         if pokemon.fainted:
             current_hp = 0
@@ -146,108 +160,3 @@ def battle_to_state(battle):
         side_one=to_engine_side(battle.team, battle.active_pokemon, True),
         side_two=to_engine_side(battle.opponent_team, battle.opponent_active_pokemon, False),
     )
-
-# evaluation function for the game state (minimax) PROBABLY GONNA MOVE THIS TO A DIFFERENT FILE LATER
-# ive taken it into my minimax file, thanks felix
-def evaluate(state):
-    my_score = 0
-    opponent_score = 0
-
-    for pokemon in state.side_one.pokemon:
-        if pokemon.maxhp > 0:
-            my_score += pokemon.hp / pokemon.maxhp
-
-    for pokemon in state.side_two.pokemon:
-        if pokemon.maxhp > 0:
-            opponent_score += pokemon.hp / pokemon.maxhp
-
-    unseen_pokemon = 6 - len(state.side_two.pokemon) # accounting for opponent's unseen pokemon
-    opponent_score += unseen_pokemon
-
-    return (my_score - opponent_score) / 6
-
-def my_options(battle):
-    legal_actions = {}
-
-    for move in battle.available_moves:
-        legal_actions[move.id] = Player.create_order(move)
-        if battle.can_tera:
-            legal_actions[f"{move.id}-tera"] = Player.create_order(move, terastallize=True)
-
-    for pokemon in battle.available_switches:
-        legal_actions[pokemon.species] = Player.create_order(pokemon)
-
-    return legal_actions
-
-
-def opponent_options(state):
-    # opponent switches to be implemented later, we'll see
-    opponent = state.side_two.pokemon[0]
-    moves = []
-
-    for move in opponent.moves:
-        moves.append(move.id)
-
-    return moves
-
-# Search (depth 1)
-
-def expected_value(state, my_move, opponent_move, from_switch): # the expected change in state, in the form of a score
-    outcomes = generate_instructions(state, my_move, opponent_move) # every possible state change, with probabilities of each branch. if passed in move is a pokemon speices id, that's switching. wonderful
-    play_state = State.from_string(state.to_string()) # copy of the real state, so that we don't modify the it while checking
-    expected_score = 0
-
-    for outcome in outcomes: # compiling all the possible changes
-        probability = outcome.percentage / 100 #
-        next_state = play_state.apply_instructions(outcome)
-        expected_score += probability * evaluate(next_state)
-        play_state.reverse_instructions(outcome) # revert back to the true state. this could be the source of a future bug
-
-    return expected_score
-
-class OneTurnPlayer(Player): # minimax player (depth 1)
-    def choose_move(self, battle:Battle):
-        if battle.active_pokemon is None or battle.opponent_active_pokemon is None:
-            return self.choose_random_move(battle)
-        
-        try:
-            state = battle_to_state(battle)
-            legal_actions = my_options(battle)
-            best_option = None
-            best_score = float("-inf")
-
-            for my_move in legal_actions:
-                worst_score = float("inf")
-
-                for opponent_move in opponent_options(state):
-                    score = expected_value(state, my_move, opponent_move, False)
-                    worst_score = min(worst_score, score)
-
-                if worst_score > best_score:
-                    best_option = my_move
-                    best_score = worst_score
-
-            return legal_actions[best_option]
-        
-        except Exception as error:
-            print(f"[{battle.battle_tag} turn {battle.turn}] fallback to random: {error!r}")
-            return self.choose_random_move(battle)
-
-async def main():
-    bot = OneTurnPlayer(battle_format="gen9randombattle", save_replays=True)
-    opponent = RandomPlayer(battle_format="gen9randombattle")
-    await bot.battle_against(opponent, n_battles=20)
-    print(f"OneTurnPlayer won {bot.n_won_battles} of {bot.n_finished_battles}")
-
-# async def main():
-#     bot = OneTurnPlayer(
-#         account_configuration=AccountConfiguration("FutureSightBot", None),
-#         battle_format="gen9randombattle",
-#         save_replays=True,
-#     )
-#     print("Waiting for a challenge... challenge FutureSightBot at http://localhost:8000")
-#     await bot.accept_challenges(None, 1)   # None = accept from anyone, 1 = one battle
-#     print(f"Done. Bot won {bot.n_won_battles} of {bot.n_finished_battles}")
-
-if __name__ == "__main__":
-    asyncio.run(main())
