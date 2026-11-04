@@ -1,3 +1,4 @@
+import asyncio
 from pickle import EMPTY_LIST
 from poke_env import *
 from poke_env.battle import Battle, MoveCategory, Move, PokemonType, Pokemon
@@ -122,3 +123,16 @@ class Minimax(Player):
        except Exception as error:
            print(f"[{battle.battle_tag} turn {battle.turn}] fallback to random: {error!r}")
            return self.choose_random_move(battle)
+
+async def main():
+    bot = Minimax(
+        account_configuration=AccountConfiguration("FutureSightBot", None),
+        battle_format="gen9randombattle",
+        save_replays=True,
+    )
+    print("Waiting for a challenge... challenge FutureSightBot at http://localhost:8000")
+    await bot.accept_challenges(None, 1)   # None = accept from anyone, 1 = one battle
+    print(f"Done. Bot won {bot.n_won_battles} of {bot.n_finished_battles}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
