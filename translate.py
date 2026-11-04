@@ -2,7 +2,7 @@ from poke_engine import Move as EngineMove
 from poke_engine import Pokemon as EnginePokemon
 from poke_engine import Side, State
 
-from poke_env.battle import Status
+from poke_env.battle import Status, Battle
 from poke_env.data import GenData
 from poke_env.stats import compute_raw_stats
 
@@ -48,7 +48,7 @@ def engine_types(pokemon):
 
     return tuple(types)
 
-def randbats_stats(pokemon):
+def randbats_stats(pokemon): # getting default stats for pokemon when we dont know them
     hp, attack, defense, sp_attack, sp_defense, speed = compute_raw_stats(
         pokemon.species, 
         [85] * 6, 
