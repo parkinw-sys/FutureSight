@@ -1,4 +1,5 @@
 import asyncio
+import time
 from pickle import EMPTY_LIST
 from poke_env import *
 from poke_env.battle import Battle, MoveCategory, Move, PokemonType, Pokemon
@@ -61,7 +62,8 @@ class Minimax(Player):
 
     def opponent_options(self, state):
         # opponent switches to be implemented later
-        opponent = state.side_two.pokemon[0]
+        active_index = int(state.side_two.active_index) # after a switch, opponent's active pokemon isn't necessarily at index 0 in the list
+        opponent = state.side_two.pokemon[active_index]
         moves = []
 
         for move in opponent.moves:
@@ -123,6 +125,8 @@ class Minimax(Player):
 
         # also add alpha-beta pruning at some point
         try:
+            start_time = time.perf_counter()
+            print(f"[turn {battle.turn}] thinking...")
 
             state = translate.battle_to_state(battle)
             my_options = self.my_options(battle)
@@ -136,6 +140,10 @@ class Minimax(Player):
                 for i in range(len(list(my_options.keys()))):
                     op = min(results[i])
                     maximum_options.append(op)
+
+                elapsed = time.perf_counter() - start_time
+                print(f"[turn {battle.turn}] done thinking in {elapsed:.1f}s")
+                
                 return my_options[max(maximum_options)[1]]
             else:
                 print("sad")
