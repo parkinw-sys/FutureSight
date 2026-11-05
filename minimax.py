@@ -64,12 +64,24 @@ class Minimax(Player):
         # opponent switches to be implemented later
         active_index = int(state.side_two.active_index) # after a switch, opponent's active pokemon isn't necessarily at index 0 in the list
         opponent = state.side_two.pokemon[active_index]
-        moves = []
+        options = []
+
+        switches = []
+        for index, pokemon in enumerate(state.side_two.pokemon):
+            if index == active_index:
+                continue
+            if pokemon.hp > 0:
+                switches.append(str(pokemon.id).lower())
+
+        if opponent.hp <= 0:
+            return switches
 
         for move in opponent.moves:
-            moves.append(move.id)
+            options.append(move.id)
 
-        return moves
+        options.extend(switches)
+
+        return options
 
     def expected_value(self, battle, my_move, opponent_move):  # the expected change in state, in the form of a score
         state = translate.battle_to_state(battle)
@@ -130,24 +142,26 @@ class Minimax(Player):
 
             state = translate.battle_to_state(battle)
             my_options = self.my_options(battle)
+
             opponent = battle.opponent_active_pokemon
             their_options = self.opponent_options(state)
-            if battle.available_moves:  # can attack
-                results = [[(self.expected_value(battle, my_move, their_move), my_move) for their_move in
-                            their_options] for my_move in list(my_options.keys())]
-                maximum_options = []
-                self.debug(results, list(my_options.keys()), their_options)
-                for i in range(len(list(my_options.keys()))):
-                    op = min(results[i])
-                    maximum_options.append(op)
 
-                elapsed = time.perf_counter() - start_time
-                print(f"[turn {battle.turn}] done thinking in {elapsed:.1f}s")
-                
-                return my_options[max(maximum_options)[1]]
-            else:
-                print("sad")
-                return self.choose_random_move(battle)
+            if not battle.available_moves:
+                their_options = ["none"] 
+
+            results = [[(self.expected_value(battle, my_move, their_move), my_move) for their_move in
+                        their_options] for my_move in list(my_options.keys())]
+            maximum_options = []
+            self.debug(results, list(my_options.keys()), their_options)
+            for i in range(len(list(my_options.keys()))):
+                op = min(results[i])
+                maximum_options.append(op)
+
+            elapsed = time.perf_counter() - start_time
+            print(f"[turn {battle.turn}] done thinking in {elapsed:.1f}s")
+            
+            return my_options[max(maximum_options)[1]]
+        
         except Exception as error:
             print(f"[{battle.battle_tag} turn {battle.turn}] fallback to random: {error!r}")
             return self.choose_random_move(battle)
