@@ -2,6 +2,10 @@ import json
 import random
 from pathlib import Path
 from poke_env.data.normalize import to_id_str
+from poke_env.teambuilder.teambuilder_pokemon import TeambuilderPokemon
+from poke_env.teambuilder.smogon_stats_teambuilder import complete_team
+from poke_env.teambuilder import Teambuilder
+from poke_env.battle import Pokemon
 
 file_path = Path(__file__).parent / "data" / "gen9randombattle.json" # these pre-determined pokemon movesets are provided by pokemon showdown
 
@@ -78,6 +82,50 @@ def role_matches_revealed(role, revealed_moves, revealed_item, revealed_ability,
             return False
  
     return True
+
+def to_teambuilder(pokemon: Pokemon) -> TeambuilderPokemon:
+    norm_moves: list[str]
+    for mv in pokemon.moves.values():
+        norm_moves.append(mv.id)
+    
+    return TeambuilderPokemon(
+        species=pokemon.species,
+        item=pokemon.item if pokemon.item else None,
+        ability=pokemon.ability if pokemon.ability else None,
+        moves=norm_moves,
+        level=pokemon.level if pokemon.level else None,
+        gender=pokemon.gender if pokemon.gender else None,
+        tera_type=pokemon.tera_type if pokemon.tera_type else None
+    )
+
+def to_poke(pokemon: TeambuilderPokemon) -> Pokemon:
+    species = to_id_str(pokemon.species)
+    final_poke = Pokemon(gen=9, species=species)
+    for move_id in pokemon.moves:
+        cleaned_id = to_id_str(move_id)
+        final_poke._add_move(cleaned_id)
+    
+    if pokemon.item:
+        final_poke.item = pokemon.item
+    if pokemon.ability:
+        final_poke.ability = pokemon.ability
+    if pokemon.level:
+        final_poke.level = pokemon.level
+    if pokemon.gender:
+        final_poke.gender = pokemon.gender
+    if pokemon.tera_type:
+        final_poke.tera_type = pokemon.tera_type
+    
+    return final_poke
+
+def guess_team(pokemon: Pokemon):
+    seed_pokemon = to_teambuilder(pokemon)
+    team = complete_team(
+        partial_team=[seed_pokemon],
+        battle_format="gen9ou",
+        team_strategy="greedy",
+        pokemon_strategy="greedy"
+    )
 
 def guess_set(pokemon, randbats_movesets, rng=None):
     species_info = randbats_movesets.get(to_id_str(pokemon.species))
