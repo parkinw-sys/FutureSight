@@ -13,7 +13,7 @@ import time
 # however, this data needs to be updated node-by-node, so poke-env data from battle object needs to be 
 # abstracted into this format 
 
-ITERATIONS = 10000
+ITERATIONS = 500
 
 # check if a leaf node has been reached
 def is_terminal(state: State):
@@ -29,10 +29,11 @@ def is_terminal(state: State):
 
 # only after is_terminal, returns 1 if won 0 if not
 def get_reward(state: State):
-    for pokemon in state.side_one.pokemon:
-        if pokemon.hp > 0:
-            return 1
-    return 0
+    if is_terminal(state):
+        for pokemon in state.side_one.pokemon:
+            if pokemon.hp > 0:
+                return 1
+        return 0
 
 def get_available_actions(side):
     legal_actions = []
@@ -181,7 +182,11 @@ class MCTS(Player):
                 reward = node.rollout()
 
                 node.back_prop(reward)
-
+                if node.terminal:
+                    print("Terminal node:", node.action)
+                    print("Side 1 HP:", [p.hp for p in node.state.side_one.pokemon])
+                    print("Side 2 HP:", [p.hp for p in node.state.side_two.pokemon])
+    
                 if (iteration + 1) % 100 == 0:
                     elapsed = time.perf_counter() - start_time
                     print(f"  {iteration + 1} iterations, {elapsed:.1f}s")
