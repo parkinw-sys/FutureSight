@@ -1,4 +1,6 @@
 import asyncio
+import time
+from pickle import EMPTY_LIST
 from poke_env import *
 from poke_env.battle import Battle, PokemonType
 import translate
@@ -56,17 +58,29 @@ class Minimax(Player):
 
 
     """
-    This is similar to my_options, but for the bot's opponent. 
+    This is similar to my_options, but for the bot's opponent.
     """
     def opponent_options(self, state):
+        active_index = int(state.side_two.active_index) # after a switch, opponent's active pokemon isn't necessarily at index 0 in the list
+        opponent = state.side_two.pokemon[active_index]
+        options = []
 
-        opponent = state.side_two.pokemon[0]
-        moves = []
+        switches = []
+        for index, pokemon in enumerate(state.side_two.pokemon):
+            if index == active_index:
+                continue
+            if pokemon.hp > 0:
+                switches.append(str(pokemon.id).lower())
+
+        if opponent.hp <= 0:
+            return switches
 
         for move in opponent.moves:
-            moves.append(move.id)
+            options.append(move.id)
 
-        return moves
+        options.extend(switches)
+
+        return options
     """
     This is the logic for converting the battle state into scores for Minimax to work on.
     
@@ -135,23 +149,27 @@ class Minimax(Player):
     def choose_move(self, battle: Battle):
 
         try:
+            start_time = time.perf_counter()
+            print(f"[turn {battle.turn}] thinking...")
 
             state = translate.battle_to_state(battle) # turning the poke_env's battle into poke_engine's state
             my_options = self.my_options(battle)
+
+            opponent = battle.opponent_active_pokemon
             their_options = self.opponent_options(state)
-            if battle.available_moves:  # does the active pokemon have the ability to do anything
-                # results is the payoff table that the algorithm decides with
-                results = [[(self.expected_value(battle, my_move, their_move), my_move) for their_move in
-                            their_options] for my_move in list(my_options.keys())]
-                maximum_options = []
-                # self.debug(results, list(my_options.keys()), their_options)
-                for i in range(len(list(my_options.keys()))):
-                    op = min(results[i])
-                    maximum_options.append(op)
-                return my_options[max(maximum_options)[1]]
-            else:
-                print("Unable to do anything")
-                return self.choose_random_move(battle)
+            if not battle.available_moves:
+                their_options = ["none"]
+                print("none")
+            # does the active pokemon have the ability to do anything
+            # results is the payoff table that the algorithm decides with
+            results = [[(self.expected_value(battle, my_move, their_move), my_move) for their_move in
+                        their_options] for my_move in list(my_options.keys())]
+            maximum_options = []
+            # self.debug(results, list(my_options.keys()), their_options)
+            for i in range(len(list(my_options.keys()))):
+                op = min(results[i])
+                maximum_options.append(op)
+            return my_options[max(maximum_options)[1]]
         except Exception as error:
             print(f"[{battle.battle_tag} turn {battle.turn}] fallback to random: {error!r}")
             return self.choose_random_move(battle)
