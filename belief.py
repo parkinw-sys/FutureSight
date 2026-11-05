@@ -126,6 +126,11 @@ def guess_team(pokemon: Pokemon):
         team_strategy="greedy",
         pokemon_strategy="greedy"
     )
+    reg_team: dict[str, Pokemon]
+    for poke in team:
+        reg_team[poke.species, to_poke(poke)]
+    
+    return reg_team
 
 def guess_set(pokemon, randbats_movesets, rng=None):
     species_info = randbats_movesets.get(to_id_str(pokemon.species))
