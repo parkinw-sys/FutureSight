@@ -1,6 +1,6 @@
 # FutureSight
 
-A Gen 9 Random Battle bot for Pokémon Showdown, comparing MCTS and expectiminimax. Built for a COP3530
+A Gen 9 Random Battle bot for Pokémon Showdown, comparing MCTS and Minimax algorithms. Built for a COP3530 project
 
 ## Setup
 
