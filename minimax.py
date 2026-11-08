@@ -1,6 +1,4 @@
 import asyncio
-import time
-from pickle import EMPTY_LIST
 from poke_env import *
 from poke_env.battle import Battle, PokemonType
 import translate
@@ -149,13 +147,9 @@ class Minimax(Player):
     def choose_move(self, battle: Battle):
 
         try:
-            start_time = time.perf_counter()
-            print(f"[turn {battle.turn}] thinking...")
-
             state = translate.battle_to_state(battle) # turning the poke_env's battle into poke_engine's state
             my_options = self.my_options(battle)
 
-            opponent = battle.opponent_active_pokemon
             their_options = self.opponent_options(state)
             if not battle.available_moves:
                 their_options = ["none"]
