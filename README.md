@@ -2,6 +2,8 @@
 
 A Gen 9 Random Battle bot for Pokémon Showdown, comparing MCTS and Minimax algorithms. Built for a COP3530 project
 
+![Example battle with the FutureSight Bot](screenshots/battle.png)
+
 ## Setup
 
 Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
@@ -16,7 +18,7 @@ Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
    node pokemon-showdown start --no-security
    ```
 
-   Leave this terminal open.
+   Leave this terminal open and go to `localhost:8000`.
 
 2. In a second terminal, set up this repo:
 
@@ -51,7 +53,22 @@ Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
    ```
 
 3. Check it works:
+
    ```
    python main.py
    ```
-   It should play one battle between two random bots and print the result.
+
+   It should simulate 10 battles between the MCTS and Minimax bots and print the result.
+   <br><br>
+   To play against either bot yourself, you need to create a Pokémon Showdown account or log in. Then, run either `mc.py` or `minimax.py`. You should see a message like: <br>
+
+   ```
+   Waiting for a challenge... challenge FutureSightBot at http://localhost:8000
+   ```
+
+   Then, click on "Find a user" and search for FutureSightBot and challenge it.
+   ![Find a user](screenshots/find-user.png)
+   ![Bot profile](screenshots/bot-profile.png)
+
+   Once you click "challenge", a secondary pop-up appears where you have to click "challenge" again. Enjoy the battle!
+   ![Secondary challenge pop-up](screenshots/challenge-screen.png)
