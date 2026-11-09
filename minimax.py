@@ -4,6 +4,7 @@ from poke_env.battle import Battle, PokemonType
 import translate
 from poke_engine import Side, State, generate_instructions
 import math
+import time
 
 SWITCH_WEIGHT = 0.1  # less than 1, probably less than 1/6.
 # this is to keep the switching scores on par with damage scores
