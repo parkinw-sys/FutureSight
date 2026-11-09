@@ -6,10 +6,10 @@ from mc import MCTS
 
 
 async def main():
-    player_1 = Minimax(max_concurrent_battles=1)
+    player_1 = Minimax(max_concurrent_battles=1, save_replays="replays/minimax_vs_mcts")
     player_2 = MCTS(max_concurrent_battles=1)
 
-    await player_1.battle_against(player_2, n_battles=20)
+    await player_1.battle_against(player_2, n_battles=10)
 
     print(f"Finished battles: {player_1.n_finished_battles}")
     print(f"Minimax wins: {player_1.n_won_battles} battles")

@@ -147,6 +147,9 @@ class Minimax(Player):
     def choose_move(self, battle: Battle):
 
         try:
+            start_time = time.perf_counter()
+            print(f"[turn {battle.turn}] Minimax thinking...")
+
             state = translate.battle_to_state(battle) # turning the poke_env's battle into poke_engine's state
             my_options = self.my_options(battle)
 
@@ -163,6 +166,10 @@ class Minimax(Player):
             for i in range(len(list(my_options.keys()))):
                 op = min(results[i])
                 maximum_options.append(op)
+
+            elapsed = time.perf_counter() - start_time
+            print(f"[turn {battle.turn}] Minimax done thinking in {elapsed:.1f}s")
+
             return my_options[max(maximum_options)[1]]
         except Exception as error:
             print(f"[{battle.battle_tag} turn {battle.turn}] fallback to random: {error!r}")

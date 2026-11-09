@@ -4,16 +4,15 @@ from poke_env.battle import Battle
 from poke_engine import generate_instructions, State
 from translate import battle_to_state 
 import random
-import copy
 import asyncio
 import math
-import copy
 import time
     
 # however, this data needs to be updated node-by-node, so poke-env data from battle object needs to be 
 # abstracted into this format 
 
 ITERATIONS = 500
+MAX_ROLLOUT_TURNS = 10
 
 # check if a leaf node has been reached
 def is_terminal(state: State):
@@ -50,8 +49,8 @@ def get_available_actions(side):
         for move in active_pokemon.moves:
             if move.pp > 0 and not move.disabled:
                 legal_actions.append(str(move.id).lower())
-                if not tera_used and not active_pokemon.terastallized:
-                    legal_actions.append(f"{move.id}-tera")
+                if not tera_used and active_pokemon.tera_type != "typeless":
+                    legal_actions.append(f"{str(move.id).lower()}-tera")
 
     for index, pokemon in enumerate(side.pokemon):
         if index == active_index:
@@ -60,6 +59,24 @@ def get_available_actions(side):
             legal_actions.append(str(pokemon.id).lower())
 
     return legal_actions
+
+def get_hp_winner(state: State):
+    my_hp = 0.0
+    for pokemon in state.side_one.pokemon:
+        if pokemon.maxhp > 0:
+            my_hp += pokemon.hp / pokemon.maxhp
+
+    opponent_hp = 0.0
+    for pokemon in state.side_two.pokemon:
+        # unseen opponents are empty "none" slots, so count them as healthy
+        if str(pokemon.id).lower() == "none":
+            opponent_hp += 1.0
+        elif pokemon.maxhp > 0:
+            opponent_hp += pokemon.hp / pokemon.maxhp
+
+    if my_hp > opponent_hp:
+        return 1
+    return 0
 
 # Node class, storing a battle state while implementing tree functionality
 class MCTSNode:
@@ -97,9 +114,12 @@ class MCTSNode:
         rand_idx = random.randint(0, len(self.available_o_actions)-1)
         side_two_action = self.available_o_actions[rand_idx]
 
-        instruction = random.choice(generate_instructions(self.state, side_one_action, side_two_action)) # instructions: list of possible outcomes
+        # pick one outcome, weighted by how likely it is
+        outcomes = generate_instructions(self.state, side_one_action, side_two_action)
+        weights = [outcome.percentage for outcome in outcomes]
+        instruction = random.choices(outcomes, weights=weights)[0]
+
         new_state = self.state.apply_instructions(instruction) # apply_instructions makes a state copy, then returns new state without modifying the current one
-        # probably suboptimal, can be enhanced using poke-engine state reversion
 
         new_node = MCTSNode(new_state, parent=self, action=side_one_action, opponent_action=side_two_action)
         self.children.append(new_node)
@@ -119,21 +139,31 @@ class MCTSNode:
     # random rollout simulation to assign rewards (also based on GeeksForGeeks page)
     def rollout(self):
         sim_state = self.state
+        turns = 0
+
         while not is_terminal(sim_state):
+            # random playouts can go on forever, so stop after a while
+            if turns >= MAX_ROLLOUT_TURNS:
+                return get_hp_winner(sim_state)
+            
             legal_actions = get_available_actions(sim_state.side_one)
             legal_o_actions = get_available_actions(sim_state.side_two)
 
-
-            if not legal_actions: 
-                raise ValueError("No side 1 actions during rollout")
-            if not legal_o_actions:
-                raise ValueError("No side 2 actions during rollout")
+            # a side with no PP and no switches left can't do anything useful, so stop here too
+            if not legal_actions or not legal_o_actions:
+                return get_hp_winner(sim_state)
             
             move = random.choice(legal_actions)
             move_o = random.choice(legal_o_actions)
-            instruction = random.choice(
-                generate_instructions(sim_state, move, move_o))
+
+            # pick one outcome, weighted by how likely it is
+            outcomes = generate_instructions(sim_state, move, move_o)
+            weights = [outcome.percentage for outcome in outcomes]
+            instruction = random.choices(outcomes, weights=weights)[0]
+
             sim_state = sim_state.apply_instructions(instruction)
+            turns += 1
+
         return get_reward(sim_state)
         
     def back_prop(self, reward: int):
@@ -165,7 +195,7 @@ class MCTS(Player):
                 return next(iter(options.values()))
 
             start_time = time.perf_counter()
-            print(f"[turn {battle.turn}] thinking...")
+            print(f"[turn {battle.turn}] MCTS thinking...")
             
             root_state = battle_to_state(battle) # should hold a poke-engine state
             root_node = MCTSNode(state=root_state)
@@ -182,17 +212,13 @@ class MCTS(Player):
                 reward = node.rollout()
 
                 node.back_prop(reward)
-                if node.terminal:
-                    print("Terminal node:", node.action)
-                    print("Side 1 HP:", [p.hp for p in node.state.side_one.pokemon])
-                    print("Side 2 HP:", [p.hp for p in node.state.side_two.pokemon])
     
                 if (iteration + 1) % 100 == 0:
                     elapsed = time.perf_counter() - start_time
                     print(f"  {iteration + 1} iterations, {elapsed:.1f}s")
 
             elapsed = time.perf_counter() - start_time
-            print(f"[turn {battle.turn}] done thinking in {elapsed:.1f}s")
+            print(f"[turn {battle.turn}] MCTS done thinking in {elapsed:.1f}s")
 
             best_child = None
             for child in root_node.children:
