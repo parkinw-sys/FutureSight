@@ -71,4 +71,5 @@ Requirements: Python 3.11+, Node.js, Rust (from https://rustup.rs).
    ![Bot profile](screenshots/bot-profile.png)
 
    Once you click "challenge", a secondary pop-up appears where you have to click "challenge" again. Enjoy the battle!
+   <br>
    ![Secondary challenge pop-up](screenshots/challenge-screen.png)
